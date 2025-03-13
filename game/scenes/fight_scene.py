@@ -15,10 +15,10 @@ class FightScene(Scene):
         
         # Stage backgrounds with different colors and properties
         self.stage_backgrounds = {
-            "dojo": {"color": (100, 50, 50), "floor": 450, "gravity": 0.8, "weather": None},
+            "dojo": {"color": (100, 50, 50), "floor": 450, "gravity": 0.8, "weather": "rain"},
             "forest": {"color": (40, 80, 40), "floor": 450, "gravity": 0.8, "weather": "rain"},
-            "temple": {"color": (70, 70, 90), "floor": 450, "gravity": 0.8, "weather": None},
-            "arena": {"color": (200, 180, 140), "floor": 450, "gravity": 0.8, "weather": None},
+            "temple": {"color": (70, 70, 90), "floor": 450, "gravity": 0.8, "weather": "rain"},
+            "arena": {"color": (200, 180, 140), "floor": 450, "gravity": 0.8, "weather": "snow"},
             "volcano": {"color": (60, 20, 20), "floor": 450, "gravity": 0.9, "weather": "sandstorm"}
         }
         

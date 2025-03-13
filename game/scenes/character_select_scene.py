@@ -2,19 +2,22 @@ import pygame
 import random
 import math
 from game.engine.scene import Scene
-from game.characters.ninja import Ninja
-from game.characters.samurai import Samurai
-from game.characters.wizard import Wizard
-from game.characters.guardian import Guardian
+from game.engine.character_factory import CharacterFactory
 
 class CharacterSelectScene(Scene):
-    """Character selection scene."""
+    """Character selection scene using the modular character factory approach."""
     
     def __init__(self, game_engine):
         super().__init__(game_engine)
-        self.characters = ["NINJA", "SAMURAI", "WIZARD", "GUARDIAN"]
+        
+        # Create character factory
+        self.character_factory = CharacterFactory()
+        
+        # Get list of characters from factory
+        self.characters = self.character_factory.get_character_names()
+        
         self.player1_selection = 0
-        self.player2_selection = 1
+        self.player2_selection = min(1, len(self.characters) - 1)  # Ensure valid index
         self.active_player = 0  # 0 for player 1, 1 for player 2
         self.selection_confirmed = [False, False]
         self.background_color = (40, 20, 60)
@@ -22,14 +25,6 @@ class CharacterSelectScene(Scene):
         self.player_colors = [(50, 100, 255), (255, 50, 50)]
         self.selected_color = (255, 255, 0)
         self.unselected_color = (150, 150, 150)
-        
-        # Character stats for display
-        self.character_stats = {
-            "NINJA": {"health": 100, "speed": 8, "attack": 10, "special": "Teleport"},
-            "SAMURAI": {"health": 120, "speed": 6, "attack": 15, "special": "Rage Mode"},
-            "WIZARD": {"health": 80, "speed": 4, "attack": 7, "special": "Ice Storm"},
-            "GUARDIAN": {"health": 150, "speed": 3, "attack": 12, "special": "Counter"}
-        }
         
         # Health scaling options
         self.health_options = ["STANDARD", "DOUBLE", "HALF", "RANDOM"]
@@ -74,55 +69,23 @@ class CharacterSelectScene(Scene):
                         self.active_player = 1 if self.active_player == 0 else 0
     
     def _create_characters(self):
-        # Create character instances based on selections
-        if self.characters[self.player1_selection] == "NINJA":
-            self.game_engine.player1_character = Ninja(is_player1=True)
-        elif self.characters[self.player1_selection] == "SAMURAI":
-            self.game_engine.player1_character = Samurai(is_player1=True)
-        elif self.characters[self.player1_selection] == "WIZARD":
-            self.game_engine.player1_character = Wizard(is_player1=True)
-        elif self.characters[self.player1_selection] == "GUARDIAN":
-            self.game_engine.player1_character = Guardian(is_player1=True)
+        """Create character instances using the factory and apply scaling."""
+        # Get selected character names
+        player1_char_name = self.characters[self.player1_selection]
+        player2_char_name = self.characters[self.player2_selection]
         
-        if self.characters[self.player2_selection] == "NINJA":
-            self.game_engine.player2_character = Ninja(is_player1=False)
-        elif self.characters[self.player2_selection] == "SAMURAI":
-            self.game_engine.player2_character = Samurai(is_player1=False)
-        elif self.characters[self.player2_selection] == "WIZARD":
-            self.game_engine.player2_character = Wizard(is_player1=False)
-        elif self.characters[self.player2_selection] == "GUARDIAN":
-            self.game_engine.player2_character = Guardian(is_player1=False)
+        # Create character instances
+        self.game_engine.player1_character = self.character_factory.create_character(player1_char_name, is_player1=True)
+        self.game_engine.player2_character = self.character_factory.create_character(player2_char_name, is_player1=False)
         
         # Apply health scaling
-        self._apply_health_scaling()
+        scaling_type = self.health_options[self.health_scaling]
+        self.character_factory.apply_health_scaling(self.game_engine.player1_character, scaling_type)
+        self.character_factory.apply_health_scaling(self.game_engine.player2_character, scaling_type)
         
         # Change to the stage select scene
         from game.scenes.stage_select_scene import StageSelectScene
         self.game_engine.change_scene(StageSelectScene(self.game_engine))
-    
-    def _apply_health_scaling(self):
-        # Apply health scaling based on selected option
-        p1 = self.game_engine.player1_character
-        p2 = self.game_engine.player2_character
-        
-        if self.health_options[self.health_scaling] == "DOUBLE":
-            p1.health *= 2
-            p1.max_health *= 2
-            p2.health *= 2
-            p2.max_health *= 2
-        elif self.health_options[self.health_scaling] == "HALF":
-            p1.health = int(p1.health / 2)
-            p1.max_health = int(p1.max_health / 2)
-            p2.health = int(p2.health / 2)
-            p2.max_health = int(p2.max_health / 2)
-        elif self.health_options[self.health_scaling] == "RANDOM":
-            # Random scaling between 0.5x and 2x
-            p1_scale = random.uniform(0.5, 2.0)
-            p2_scale = random.uniform(0.5, 2.0)
-            p1.health = int(p1.health * p1_scale)
-            p1.max_health = int(p1.max_health * p1_scale)
-            p2.health = int(p2.health * p2_scale)
-            p2.max_health = int(p2.max_health * p2_scale)
     
     def update(self):
         self.animation_timer += 1
@@ -267,7 +230,7 @@ class CharacterSelectScene(Scene):
         screen.blit(controls_surf, controls_rect)
     
     def _draw_character_preview(self, screen, character, rect, is_player1):
-        # Draw a simple preview of the character
+        """Draw a simple preview of the character."""
         x = rect.centerx
         y = rect.centery + 30  # Slightly lower to show full character
         
@@ -275,121 +238,154 @@ class CharacterSelectScene(Scene):
         bounce = math.sin(self.animation_timer * 0.1) * 5
         y += bounce
         
-        if character == "NINJA":
-            # Draw ninja
-            body_color = (50, 50, 150) if is_player1 else (150, 50, 50)
-            
-            # Body
-            pygame.draw.rect(screen, body_color, (x-15, y-50, 30, 50))
-            # Head
-            pygame.draw.circle(screen, body_color, (x, y-65), 15)
-            # Eyes
-            eye_x = x + 5 if is_player1 else x - 5
-            pygame.draw.circle(screen, (255, 255, 255), (eye_x, y-65), 5)
-            pygame.draw.circle(screen, (0, 0, 0), (eye_x, y-65), 2)
-            # Ninja band
-            pygame.draw.rect(screen, (0, 0, 0), (x-15, y-72, 30, 5))
-            # Sword on back
-            if is_player1:
-                pygame.draw.rect(screen, (150, 150, 150), (x+15, y-60, 5, 40))
-            else:
-                pygame.draw.rect(screen, (150, 150, 150), (x-20, y-60, 5, 40))
+        # Using a dictionary dispatch pattern to eliminate redundant if/elif blocks
+        preview_methods = {
+            "NINJA": self._draw_ninja_preview,
+            "SAMURAI": self._draw_samurai_preview,
+            "WIZARD": self._draw_wizard_preview,
+            "GUARDIAN": self._draw_guardian_preview
+        }
         
-        elif character == "SAMURAI":
-            # Draw samurai
-            body_color = (70, 50, 150) if is_player1 else (150, 50, 70)
-            
-            # Body with armor
-            pygame.draw.rect(screen, body_color, (x-20, y-50, 40, 50))
-            # Armor plates
-            armor_color = (100, 100, 180) if is_player1 else (180, 100, 100)
-            pygame.draw.rect(screen, armor_color, (x-20, y-50, 40, 15))
-            pygame.draw.rect(screen, armor_color, (x-20, y-25, 40, 10))
-            # Head with helmet
-            pygame.draw.circle(screen, body_color, (x, y-65), 15)
-            # Helmet
-            helmet_points = [(x-15, y-65), (x+15, y-65), (x, y-85)]
-            pygame.draw.polygon(screen, armor_color, helmet_points)
-            # Face mask
-            pygame.draw.rect(screen, (50, 50, 50), (x-10, y-70, 20, 10))
-            # Sword
-            if is_player1:
-                pygame.draw.rect(screen, (100, 100, 100), (x+20, y-70, 5, 70))
-            else:
-                pygame.draw.rect(screen, (100, 100, 100), (x-25, y-70, 5, 70))
+        # Call the appropriate draw method for the character
+        if character in preview_methods:
+            preview_methods[character](screen, x, y, is_player1)
+        else:
+            # Fallback for any unknown characters
+            self._draw_default_preview(screen, x, y, is_player1)
+    
+    def _draw_ninja_preview(self, screen, x, y, is_player1):
+        """Draw ninja character preview."""
+        body_color = (50, 50, 150) if is_player1 else (150, 50, 50)
         
-        elif character == "WIZARD":
-            # Draw wizard
-            body_color = (70, 20, 120) if is_player1 else (120, 20, 70)
-            
-            # Body
-            pygame.draw.rect(screen, body_color, (x-20, y-50, 40, 50))
-            # Head
-            pygame.draw.circle(screen, body_color, (x, y-65), 15)
-            # Wizard hat
-            hat_color = (40, 0, 80) if is_player1 else (80, 0, 40)
-            hat_points = [(x, y-95), (x-20, y-75), (x+20, y-75)]
-            pygame.draw.polygon(screen, hat_color, hat_points)
-            pygame.draw.rect(screen, hat_color, (x-25, y-75, 50, 5))
-            # Eyes
-            eye_x = x + 5 if is_player1 else x - 5
-            pygame.draw.circle(screen, (255, 255, 255), (eye_x, y-65), 5)
-            pygame.draw.circle(screen, (0, 0, 255), (eye_x, y-65), 2)
-            # Staff
-            staff_color = (120, 80, 0)
-            orb_color = (50, 100, 255)
-            if is_player1:
-                pygame.draw.rect(screen, staff_color, (x+20, y-80, 5, 80))
-                pygame.draw.circle(screen, orb_color, (x+22, y-80), 10)
-            else:
-                pygame.draw.rect(screen, staff_color, (x-25, y-80, 5, 80))
-                pygame.draw.circle(screen, orb_color, (x-22, y-80), 10)
-            
-            # Magic particles
-            for i in range(5):
-                angle = (self.animation_timer * 0.1 + i * 1.2) % 6.28
-                dist = 15 + math.sin(self.animation_timer * 0.05 + i) * 5
-                px = x + math.cos(angle) * dist
-                py = y - 90 + math.sin(angle) * dist * 0.5
-                particle_color = (100 + i * 30, 100, 255 - i * 30)
-                pygame.draw.circle(screen, particle_color, (int(px), int(py)), 2 + i % 2)
+        # Body
+        pygame.draw.rect(screen, body_color, (x-15, y-50, 30, 50))
+        # Head
+        pygame.draw.circle(screen, body_color, (x, y-65), 15)
+        # Eyes
+        eye_x = x + 5 if is_player1 else x - 5
+        pygame.draw.circle(screen, (255, 255, 255), (eye_x, y-65), 5)
+        pygame.draw.circle(screen, (0, 0, 0), (eye_x, y-65), 2)
+        # Ninja band
+        pygame.draw.rect(screen, (0, 0, 0), (x-15, y-72, 30, 5))
+        # Sword on back
+        if is_player1:
+            pygame.draw.rect(screen, (150, 150, 150), (x+15, y-60, 5, 40))
+        else:
+            pygame.draw.rect(screen, (150, 150, 150), (x-20, y-60, 5, 40))
+    
+    def _draw_samurai_preview(self, screen, x, y, is_player1):
+        """Draw samurai character preview."""
+        body_color = (70, 50, 150) if is_player1 else (150, 50, 70)
         
-        elif character == "GUARDIAN":
-            # Draw guardian
-            body_color = (50, 100, 50) if is_player1 else (100, 50, 50)
-            armor_color = (100, 150, 100) if is_player1 else (150, 100, 100)
-            
-            # Body (wider)
-            pygame.draw.rect(screen, body_color, (x-25, y-50, 50, 50))
-            # Armor plates
-            pygame.draw.rect(screen, armor_color, (x-25, y-50, 50, 15))
-            pygame.draw.rect(screen, armor_color, (x-20, y-30, 40, 20))
-            # Head with helmet
-            pygame.draw.circle(screen, body_color, (x, y-65), 15)
-            # Helmet
-            pygame.draw.rect(screen, armor_color, (x-18, y-80, 36, 30), border_radius=5)
-            # Visor
-            pygame.draw.rect(screen, (50, 50, 50), (x-15, y-70, 30, 10))
-            # Shoulder guards
-            pygame.draw.circle(screen, armor_color, (x-25, y-45), 8)
-            pygame.draw.circle(screen, armor_color, (x+25, y-45), 8)
-            # Weapon (hammer or shield)
-            if is_player1:
-                # Shield
-                pygame.draw.rect(screen, (220, 220, 100), (x-40, y-60, 20, 40), border_radius=5)
-                # Hammer on back
-                pygame.draw.rect(screen, (100, 70, 40), (x+25, y-70, 5, 60))
-                pygame.draw.rect(screen, (150, 150, 150), (x+15, y-70, 25, 15))
-            else:
-                # Shield
-                pygame.draw.rect(screen, (220, 220, 100), (x+20, y-60, 20, 40), border_radius=5)
-                # Hammer on back
-                pygame.draw.rect(screen, (100, 70, 40), (x-30, y-70, 5, 60))
-                pygame.draw.rect(screen, (150, 150, 150), (x-40, y-70, 25, 15))
+        # Body with armor
+        pygame.draw.rect(screen, body_color, (x-20, y-50, 40, 50))
+        # Armor plates
+        armor_color = (100, 100, 180) if is_player1 else (180, 100, 100)
+        pygame.draw.rect(screen, armor_color, (x-20, y-50, 40, 15))
+        pygame.draw.rect(screen, armor_color, (x-20, y-25, 40, 10))
+        # Head with helmet
+        pygame.draw.circle(screen, body_color, (x, y-65), 15)
+        # Helmet
+        helmet_points = [(x-15, y-65), (x+15, y-65), (x, y-85)]
+        pygame.draw.polygon(screen, armor_color, helmet_points)
+        # Face mask
+        pygame.draw.rect(screen, (50, 50, 50), (x-10, y-70, 20, 10))
+        # Sword
+        if is_player1:
+            pygame.draw.rect(screen, (100, 100, 100), (x+20, y-70, 5, 70))
+        else:
+            pygame.draw.rect(screen, (100, 100, 100), (x-25, y-70, 5, 70))
+    
+    def _draw_wizard_preview(self, screen, x, y, is_player1):
+        """Draw wizard character preview."""
+        body_color = (70, 20, 120) if is_player1 else (120, 20, 70)
+        
+        # Body
+        pygame.draw.rect(screen, body_color, (x-20, y-50, 40, 50))
+        # Head
+        pygame.draw.circle(screen, body_color, (x, y-65), 15)
+        # Wizard hat
+        hat_color = (40, 0, 80) if is_player1 else (80, 0, 40)
+        hat_points = [(x, y-95), (x-20, y-75), (x+20, y-75)]
+        pygame.draw.polygon(screen, hat_color, hat_points)
+        pygame.draw.rect(screen, hat_color, (x-25, y-75, 50, 5))
+        # Eyes
+        eye_x = x + 5 if is_player1 else x - 5
+        pygame.draw.circle(screen, (255, 255, 255), (eye_x, y-65), 5)
+        pygame.draw.circle(screen, (0, 0, 255), (eye_x, y-65), 2)
+        # Staff
+        staff_color = (120, 80, 0)
+        orb_color = (50, 100, 255)
+        if is_player1:
+            pygame.draw.rect(screen, staff_color, (x+20, y-80, 5, 80))
+            pygame.draw.circle(screen, orb_color, (x+22, y-80), 10)
+        else:
+            pygame.draw.rect(screen, staff_color, (x-25, y-80, 5, 80))
+            pygame.draw.circle(screen, orb_color, (x-22, y-80), 10)
+        
+        # Magic particles
+        for i in range(5):
+            angle = (self.animation_timer * 0.1 + i * 1.2) % 6.28
+            dist = 15 + math.sin(self.animation_timer * 0.05 + i) * 5
+            px = x + math.cos(angle) * dist
+            py = y - 90 + math.sin(angle) * dist * 0.5
+            particle_color = (100 + i * 30, 100, 255 - i * 30)
+            pygame.draw.circle(screen, particle_color, (int(px), int(py)), 2 + i % 2)
+    
+    def _draw_guardian_preview(self, screen, x, y, is_player1):
+        """Draw guardian character preview."""
+        body_color = (50, 100, 50) if is_player1 else (100, 50, 50)
+        armor_color = (100, 150, 100) if is_player1 else (150, 100, 100)
+        
+        # Body (wider)
+        pygame.draw.rect(screen, body_color, (x-25, y-50, 50, 50))
+        # Armor plates
+        pygame.draw.rect(screen, armor_color, (x-25, y-50, 50, 15))
+        pygame.draw.rect(screen, armor_color, (x-20, y-30, 40, 20))
+        # Head with helmet
+        pygame.draw.circle(screen, body_color, (x, y-65), 15)
+        # Helmet
+        pygame.draw.rect(screen, armor_color, (x-18, y-80, 36, 30), border_radius=5)
+        # Visor
+        pygame.draw.rect(screen, (50, 50, 50), (x-15, y-70, 30, 10))
+        # Shoulder guards
+        pygame.draw.circle(screen, armor_color, (x-25, y-45), 8)
+        pygame.draw.circle(screen, armor_color, (x+25, y-45), 8)
+        # Weapon (hammer or shield)
+        if is_player1:
+            # Shield
+            pygame.draw.rect(screen, (220, 220, 100), (x-40, y-60, 20, 40), border_radius=5)
+            # Hammer on back
+            pygame.draw.rect(screen, (100, 70, 40), (x+25, y-70, 5, 60))
+            pygame.draw.rect(screen, (150, 150, 150), (x+15, y-70, 25, 15))
+        else:
+            # Shield
+            pygame.draw.rect(screen, (220, 220, 100), (x+20, y-60, 20, 40), border_radius=5)
+            # Hammer on back
+            pygame.draw.rect(screen, (100, 70, 40), (x-30, y-70, 5, 60))
+            pygame.draw.rect(screen, (150, 150, 150), (x-40, y-70, 25, 15))
+    
+    def _draw_default_preview(self, screen, x, y, is_player1):
+        """Draw default character preview for any unknown characters."""
+        body_color = (100, 100, 150) if is_player1 else (150, 100, 100)
+        
+        # Simple body
+        pygame.draw.rect(screen, body_color, (x-20, y-50, 40, 50))
+        # Head
+        pygame.draw.circle(screen, body_color, (x, y-65), 15)
+        # Eyes
+        eye_x = x + 5 if is_player1 else x - 5
+        pygame.draw.circle(screen, (255, 255, 255), (eye_x, y-65), 5)
+        pygame.draw.circle(screen, (0, 0, 0), (eye_x, y-65), 2)
+        # Question mark to indicate unknown
+        text = self.game_engine.fonts['small'].render("?", True, (255, 255, 255))
+        text_rect = text.get_rect(center=(x, y-30))
+        screen.blit(text, text_rect)
     
     def _draw_character_stats(self, screen, character, x, y, color):
         """Draw the character stats below the preview."""
-        stats = self.character_stats[character]
+        # Get character stats from factory instead of hardcoded dict
+        stats = self.character_factory.get_character_stats(character)
         
         # Background panel
         panel_width = 200
